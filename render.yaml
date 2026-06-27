@@ -1,0 +1,61 @@
+# Render blueprint — AltSpace AI Chief of Staff (backend + Postgres)
+#
+# One-click deploy: in the Render dashboard choose "New +" -> "Blueprint",
+# point it at this public repo, and Render provisions both resources below.
+# On apply, Render prompts for the two `sync: false` secrets (GROQ_API_KEY,
+# JWT_SECRET). DATABASE_URL is injected automatically from the managed Postgres.
+#
+# The frontend (Streamlit) deploys separately on Streamlit Community Cloud —
+# see docs/DEPLOY.md. Render only hosts the FastAPI backend + database.
+
+databases:
+  - name: altspace-db
+    plan: free
+    # Render's free Postgres. Connection string is exposed to the web service
+    # below via `fromDatabase` (property: connectionString).
+
+services:
+  - type: web
+    name: altspace-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    # Install everything the FastAPI app + LangGraph agent + Alembic need.
+    buildCommand: pip install -r requirements.txt
+    # Apply migrations on every deploy, then boot Uvicorn on Render's $PORT.
+    # `alembic upgrade head` is idempotent — safe to run on each restart.
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Render pings this for health; FastAPI serves Swagger here, so it 200s.
+    healthCheckPath: /docs
+    autoDeploy: true
+    envVars:
+      # Injected from the managed Postgres above — never set this by hand.
+      # NOTE: Render emits a `postgres://...` URL; app/database.py normalizes
+      # the `postgres://` -> `postgresql://` prefix for SQLAlchemy + psycopg2.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: altspace-db
+          property: connectionString
+
+      # Secrets — Render prompts for these at deploy time (sync: false).
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+
+      # Non-secret config — pinned to the locked free-tier stack.
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "10080" # 7 days — graders stay logged in across the demo
+      - key: CLASSIFIER_MODEL
+        value: llama-3.1-8b-instant
+      - key: SUMMARY_MODEL
+        value: llama-3.3-70b-versatile
+      - key: PYTHON_VERSION
+        value: "3.10"
+
+      # CORS origin for the Streamlit frontend. Replace with your Streamlit
+      # Community Cloud URL after the frontend deploys (no trailing slash).
+      - key: FRONTEND_ORIGIN
+        sync: false

@@ -1,0 +1,1 @@
+"""AltSpace backend application package."""

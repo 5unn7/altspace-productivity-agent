@@ -1,0 +1,107 @@
+// AltSpace — AI Chief of Staff · Database schema
+// IITR-SE-2509 Module 6 Capstone · Project 03 — Personal Productivity Agent
+//
+// Importable into https://dbdiagram.io  (New > Import > paste this file).
+// Mirrors backend/app/models.py exactly. Value vocabularies live in column
+// notes; they're enforced in the app layer, not as SQL enums, to keep
+// migrations portable across SQLite (dev) and Postgres (prod).
+
+Project altspace {
+  database_type: 'PostgreSQL'
+  Note: '''
+    AltSpace v0 — an AI chief of staff you check in with twice a day.
+    Five tables: users own everything; tasks/daily_logs/eod_summaries/
+    weekly_reviews all hang off a user with ON DELETE CASCADE.
+  '''
+}
+
+Table users {
+  id                int          [pk, increment]
+  email             varchar(255) [not null, unique, note: 'login id']
+  hashed_password   varchar(255) [not null, note: 'bcrypt hash — never plaintext']
+  name              varchar(120) [not null]
+  streak_count      int          [not null, default: 0, note: 'consecutive check-in days']
+  last_checkin_date date         [note: 'nullable — null until first check-in']
+  created_at        timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    email [unique, name: 'ix_users_email']
+  }
+
+  Note: 'The account. One per person; owns all other rows.'
+}
+
+Table tasks {
+  id           int          [pk, increment]
+  user_id      int          [not null, note: 'FK -> users.id']
+  title        varchar(500) [not null]
+  category     varchar(20)  [not null, default: 'other', note: 'work | personal | health | learning | other']
+  priority     varchar(10)  [not null, default: 'medium', note: 'low | medium | high']
+  status       varchar(12)  [not null, default: 'pending', note: 'pending | completed | slipped']
+  source       varchar(16)  [not null, default: 'morning', note: 'morning | agent_planned | emerged']
+  due_date     date         [note: 'nullable']
+  created_at   timestamptz  [not null, default: `now()`]
+  completed_at timestamptz  [note: 'nullable — set when status -> completed']
+
+  Indexes {
+    user_id  [name: 'ix_tasks_user_id']
+    due_date [name: 'ix_tasks_due_date']
+  }
+
+  Note: 'A unit of work. Created from a morning brain-dump, planned by the agent for tomorrow, or emerged during an evening recap.'
+}
+
+Table daily_logs {
+  id         int         [pk, increment]
+  user_id    int         [not null, note: 'FK -> users.id']
+  log_date   date        [not null]
+  kind       varchar(10) [not null, note: 'morning | evening']
+  raw_text   text        [not null, default: '', note: 'the raw check-in text the agent parsed']
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id  [name: 'ix_daily_logs_user_id']
+    log_date [name: 'ix_daily_logs_log_date']
+  }
+
+  Note: 'Raw, unparsed check-in text — the audit trail behind every classification and summary.'
+}
+
+Table eod_summaries {
+  id            int         [pk, increment]
+  user_id       int         [not null, note: 'FK -> users.id']
+  summary_date  date        [not null]
+  summary_text  text        [not null, note: 'AltSpace-voice 1-paragraph done-vs-slipped recap']
+  tomorrow_plan text        [not null, default: '', note: 'the next-day plan prose']
+  stats_json    text        [not null, default: '{}', note: 'JSON: counts by category/status']
+  created_at    timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id      [name: 'ix_eod_summaries_user_id']
+    summary_date [name: 'ix_eod_summaries_summary_date']
+  }
+
+  Note: 'One row per evening check-in. Powers the "This week" view.'
+}
+
+Table weekly_reviews {
+  id            int         [pk, increment]
+  user_id       int         [not null, note: 'FK -> users.id']
+  week_start    date        [not null, note: 'Monday of the reviewed week']
+  patterns_text text        [not null, note: 'AltSpace-voice patterns paragraph']
+  stats_json    text        [not null, default: '{}', note: 'JSON: 7-day rollups']
+  created_at    timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id    [name: 'ix_weekly_reviews_user_id']
+    week_start [name: 'ix_weekly_reviews_week_start']
+  }
+
+  Note: 'One row per weekly pattern review (manual button or APScheduler).'
+}
+
+// ---- relationships (all children CASCADE on user delete) ----
+Ref: tasks.user_id          > users.id [delete: cascade]
+Ref: daily_logs.user_id     > users.id [delete: cascade]
+Ref: eod_summaries.user_id  > users.id [delete: cascade]
+Ref: weekly_reviews.user_id > users.id [delete: cascade]

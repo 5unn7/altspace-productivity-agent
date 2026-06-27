@@ -1,0 +1,26 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# env / secrets — NEVER commit real keys (.env.example IS tracked)
+.env
+
+# databases / langgraph checkpoints
+*.db
+*.db-journal
+*.checkpoints.db
+*.sqlite3
+
+# streamlit local secrets
+.streamlit/secrets.toml
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

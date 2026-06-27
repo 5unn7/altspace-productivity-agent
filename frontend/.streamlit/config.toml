@@ -1,0 +1,18 @@
+# AltSpace — Streamlit theme.
+# Dark, low-chrome, chief-of-staff aesthetic: warm charcoal surfaces, a single
+# amber accent. Mono is reserved (in the UI helpers) for data; the base font is
+# a clean sans for prose.
+
+[theme]
+base = "dark"
+primaryColor = "#f5a623"            # amber accent — buttons, focus, active
+backgroundColor = "#16181d"         # app background (warm charcoal)
+secondaryBackgroundColor = "#1f232b" # cards, sidebar, inputs
+textColor = "#e7e9ee"               # primary text
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
