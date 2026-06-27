@@ -40,7 +40,14 @@ class ApiError(Exception):
 # base url + headers
 # --------------------------------------------------------------------------- #
 def base_url() -> str:
-    """Resolve the backend base URL (secrets → env → localhost), no trailing slash."""
+    """Resolve the backend base URL (secrets → env → localhost), no trailing slash.
+
+    Defensively strips a trailing ``/docs`` / ``/openapi.json`` / ``/redoc`` —
+    the backend's Swagger URL is the easiest thing to paste into the
+    ``API_BASE_URL`` secret by mistake, and ``{base}/docs/auth/signup`` 404s the
+    whole app. Normalizing it here means the app keeps working even if the
+    secret points at the docs page instead of the API root.
+    """
     url: str | None = None
     try:
         # st.secrets raises if no secrets file exists; guard it.
@@ -50,6 +57,10 @@ def base_url() -> str:
         url = None
     if not url:
         url = os.environ.get("API_BASE_URL") or DEFAULT_BASE_URL
+    url = url.strip().rstrip("/")
+    for suffix in ("/docs", "/openapi.json", "/redoc"):
+        if url.endswith(suffix):
+            url = url[: -len(suffix)]
     return url.rstrip("/")
 
 
@@ -126,8 +137,8 @@ def _request(
         ) from None
     except httpx.TimeoutException:
         raise ApiError(
-            "AltSpace took too long to respond. The model may be warming up — "
-            "try again in a moment."
+            "AltSpace took too long to respond. The model may be warming up. "
+            "Try again in a moment."
         ) from None
     except httpx.HTTPError as exc:  # pragma: no cover - defensive
         raise ApiError(f"Network error talking to AltSpace: {exc}") from None

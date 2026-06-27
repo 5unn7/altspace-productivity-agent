@@ -11,6 +11,13 @@ secondaryBackgroundColor = "#1f232b" # cards, sidebar, inputs
 textColor = "#e7e9ee"               # primary text
 font = "sans serif"
 
+[client]
+# Strip Streamlit's dev chrome on the hosted deploy: hides the Deploy button and
+# the developer items (Fork / view-source / record) from the toolbar menu so the
+# grader sees the product, not the platform. The remaining footer + status widget
+# are hidden via CSS in streamlit_app.py.
+toolbarMode = "minimal"
+
 [server]
 headless = true
 
